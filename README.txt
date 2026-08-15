@@ -49,3 +49,27 @@ v1.1.6 stabilization
 - Keeps 5-second STATUS as backup synchronization only.
 - Driver Information version updated to v1.1.6.
 - Intended to pair with ESP32-S3 BLE STABLE v3 firmware.
+
+
+v1.1.7 FIXED
+- Adds visible 핸드폰 삭제 (마지막 등록) push button.
+- Button sends UNPAIR_LAST to ESP V8.
+- Registered-but-lost RSSI displays -127 dBm instead of 0 dBm.
+- Setup updates phonePairing capability schema before presentation.
+
+
+v1.2.1
+- Adds a separate Current Phone Delete custom capability so the button renders as its own detail-view card.
+- Button label: 현재 핸드폰 삭제
+- Safety: SmartThings Edge does not reveal which physical handset pressed a command. The driver never guesses.
+  If only one phone is registered, that slot is removed. With multiple phones, deletion proceeds only when exactly one registered phone is currently detected; otherwise status becomes 현재 핸드폰 식별 불가 and nothing is deleted.
+- Uses ESP V8 command UNPAIR <slot>. No ESP firmware change is required.
+
+
+v1.2.1
+- 403을 발생시키던 currentPhoneDelete custom capability 생성 제거
+- SmartThings 표준 momentary push 버튼으로 현재 핸드폰 삭제 구현
+- 버튼 처리 시 ESP V8에 UNPAIR n 전송
+
+
+v1.2.1 삭제 방식: SmartThings 기기 설정에서 삭제할 핸드폰 1~4를 선택한 뒤 상세화면의 선택한 핸드폰 삭제 버튼을 누르면 ESP에 UNPAIR n을 전송합니다. 신규 custom capability/command를 만들지 않습니다.

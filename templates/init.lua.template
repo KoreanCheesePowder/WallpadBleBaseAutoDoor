@@ -8,12 +8,13 @@ local door_proximity = capabilities["__DOOR_PROXIMITY_CAPABILITY_ID__"]
 local phone_count = capabilities["__PHONE_COUNT_CAPABILITY_ID__"]
 local phone_pairing = capabilities["__PHONE_PAIRING_CAPABILITY_ID__"]
 local driver_info = capabilities["__DRIVER_INFO_CAPABILITY_ID__"]
+local current_phone_delete = capabilities.momentary
 
 local ESP_IP = "192.168.1.101"
 local ESP_PORT = 8900
 local DEVICE_DNI = "cp-ble-door-presence-192.168.1.101"
 local DEVICE_PROFILE = "ble-door-presence"
-local DRIVER_VERSION = "v1.1.6"
+local DRIVER_VERSION = "v1.2.1"
 local AUTHOR = "치즈가루"
 local POLL_INTERVAL_SEC = 5.0
 local STATUS_TIMEOUT_SEC = 4.0
@@ -125,7 +126,7 @@ local function compute_display(device)
     end
   end
 
-  local display_rssi = 0
+  local display_rssi = (count > 0) and -127 or 0
   local display_state = "offline" -- presentation에서 '못찾음'으로 표시
   local display_presence = "not present"
 
@@ -519,6 +520,40 @@ local function start_pairing_handler(driver, device, command)
   end
 end
 
+local function delete_current_phone_handler(driver, device, command)
+  local count = math.max(0, math.min(4, field_number(device, FIELD_BOND_COUNT, 0)))
+  if count <= 0 then
+    log.warn("No registered phones to delete")
+    return
+  end
+
+  -- The slot is selected explicitly in the device Settings preference.
+  -- This avoids guessing which physical phone pressed the SmartThings button.
+  local pref = device.preferences and device.preferences.deletePhoneSlot or "1"
+  local target = tonumber(pref) or 1
+  if target < 1 or target > 4 then
+    log.warn("Invalid deletePhoneSlot preference: " .. tostring(pref))
+    return
+  end
+  if target > count then
+    log.warn(string.format("Selected phone %d is not registered (BOND_COUNT=%d)", target, count))
+    return
+  end
+
+  log.info(string.format("Deleting explicitly selected phone slot %d", target))
+  local ok, err = send_line(device, "UNPAIR " .. tostring(target))
+  if not ok then
+    log.warn(string.format("UNPAIR %d failed: %s", target, tostring(err)))
+    return
+  end
+  cosock.spawn(function()
+    socket.sleep(0.35)
+    request_status(device)
+    socket.sleep(0.65)
+    request_status(device)
+  end, "ble-selected-phone-delete-refresh")
+end
+
 local function discovery_handler(driver, opts, should_continue)
   log.info("[DISCOVERY] START")
   log.info(string.format("[DISCOVERY] Trying ESP %s:%d", ESP_IP, ESP_PORT))
@@ -562,6 +597,7 @@ local driver_template = {
     capabilities.presenceSensor,
     phone_count,
     phone_pairing,
+    current_phone_delete,
     driver_info,
     capabilities.refresh
   },
@@ -576,6 +612,9 @@ local driver_template = {
     },
     [phone_pairing.ID] = {
       [phone_pairing.commands.startPairing.NAME] = start_pairing_handler
+    },
+    [current_phone_delete.ID] = {
+      [current_phone_delete.commands.push.NAME] = delete_current_phone_handler
     }
   }
 }

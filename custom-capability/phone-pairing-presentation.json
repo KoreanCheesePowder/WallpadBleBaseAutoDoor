@@ -18,12 +18,36 @@
       "state": {
         "label": "{{status.value}}",
         "alternatives": [
-          { "key": "idle", "value": "대기", "type": "inactive" },
-          { "key": "pairing", "value": "페어링 중", "type": "active" },
-          { "key": "success", "value": "등록 완료", "type": "active" },
-          { "key": "full", "value": "최대 4대 등록됨", "type": "inactive" },
-          { "key": "timeout", "value": "시간 초과", "type": "inactive" },
-          { "key": "error", "value": "오류", "type": "inactive" }
+          {
+            "key": "idle",
+            "value": "대기",
+            "type": "inactive"
+          },
+          {
+            "key": "pairing",
+            "value": "페어링 중",
+            "type": "active"
+          },
+          {
+            "key": "success",
+            "value": "등록 완료",
+            "type": "active"
+          },
+          {
+            "key": "full",
+            "value": "최대 4대 등록됨",
+            "type": "inactive"
+          },
+          {
+            "key": "timeout",
+            "value": "시간 초과",
+            "type": "inactive"
+          },
+          {
+            "key": "error",
+            "value": "오류",
+            "type": "inactive"
+          }
         ]
       }
     },

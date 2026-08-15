@@ -39,6 +39,19 @@
     },
     {
       "component": "main",
+      "capability": "momentary",
+      "version": 1,
+      "values": [],
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/0/label",
+          "value": "선택한 핸드폰 삭제"
+        }
+      ]
+    },
+    {
+      "component": "main",
       "capability": "__DRIVER_INFO_CAPABILITY_ID__",
       "version": 1,
       "values": [],

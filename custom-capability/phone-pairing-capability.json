@@ -5,10 +5,14 @@
       "schema": {
         "type": "object",
         "properties": {
-          "value": { "type": "string" }
+          "value": {
+            "type": "string"
+          }
         },
         "additionalProperties": false,
-        "required": ["value"]
+        "required": [
+          "value"
+        ]
       }
     },
     "status": {
@@ -17,11 +21,20 @@
         "properties": {
           "value": {
             "type": "string",
-            "enum": ["idle", "pairing", "success", "full", "timeout", "error"]
+            "enum": [
+              "idle",
+              "pairing",
+              "success",
+              "full",
+              "timeout",
+              "error"
+            ]
           }
         },
         "additionalProperties": false,
-        "required": ["value"]
+        "required": [
+          "value"
+        ]
       }
     }
   },

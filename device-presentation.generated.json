@@ -1,6 +1,6 @@
 {
     "mnmn": "SmartThingsCommunity",
-    "vid": "579bedf1-5ba1-3e8d-b2bd-2e70f1f24319",
+    "vid": "272cce1e-acbe-3032-a7fe-5dfab66f94f8",
     "version": "0.0.1",
     "type": "profile",
     "dashboard": {
@@ -42,6 +42,19 @@
         },
         {
             "component": "main",
+            "capability": "momentary",
+            "version": 1,
+            "values": [],
+            "patch": [
+                {
+                    "op": "replace",
+                    "path": "/0/label",
+                    "value": "선택한 핸드폰 삭제"
+                }
+            ]
+        },
+        {
+            "component": "main",
             "capability": "buildbook37604.driverInformation",
             "version": 1,
             "values": [],
@@ -76,6 +89,6 @@
         ],
         "actions": []
     },
-    "presentationId": "579bedf1-5ba1-3e8d-b2bd-2e70f1f24319",
+    "presentationId": "272cce1e-acbe-3032-a7fe-5dfab66f94f8",
     "manufacturerName": "SmartThingsCommunity"
 }

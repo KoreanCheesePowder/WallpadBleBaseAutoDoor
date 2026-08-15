@@ -10,6 +10,8 @@ components:
         version: 1
       - id: __PHONE_PAIRING_CAPABILITY_ID__
         version: 1
+      - id: momentary
+        version: 1
       - id: __DRIVER_INFO_CAPABILITY_ID__
         version: 1
       - id: refresh
@@ -19,3 +21,17 @@ components:
 metadata:
   vid: __PRESENTATION_ID__
   mnmn: __MANUFACTURER_NAME__
+
+preferences:
+  - name: deletePhoneSlot
+    title: "삭제할 핸드폰"
+    description: "삭제 버튼으로 해제할 등록 핸드폰을 선택합니다."
+    required: true
+    preferenceType: enumeration
+    definition:
+      options:
+        "1": "핸드폰 1"
+        "2": "핸드폰 2"
+        "3": "핸드폰 3"
+        "4": "핸드폰 4"
+      default: "1"

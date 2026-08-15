@@ -10,6 +10,8 @@ components:
         version: 1
       - id: buildbook37604.phonePairing
         version: 1
+      - id: momentary
+        version: 1
       - id: buildbook37604.driverInformation
         version: 1
       - id: refresh
@@ -17,5 +19,19 @@ components:
     categories:
       - name: PresenceSensor
 metadata:
-  vid: 579bedf1-5ba1-3e8d-b2bd-2e70f1f24319
+  vid: 272cce1e-acbe-3032-a7fe-5dfab66f94f8
   mnmn: SmartThingsCommunity
+
+preferences:
+  - name: deletePhoneSlot
+    title: "삭제할 핸드폰"
+    description: "삭제 버튼으로 해제할 등록 핸드폰을 선택합니다."
+    required: true
+    preferenceType: enumeration
+    definition:
+      options:
+        "1": "핸드폰 1"
+        "2": "핸드폰 2"
+        "3": "핸드폰 3"
+        "4": "핸드폰 4"
+      default: "1"
