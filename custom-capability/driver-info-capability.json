@@ -1,0 +1,26 @@
+{
+  "name": "Driver Information",
+  "attributes": {
+    "author": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "value": { "type": "string" }
+        },
+        "additionalProperties": false,
+        "required": ["value"]
+      }
+    },
+    "driverVersion": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "value": { "type": "string" }
+        },
+        "additionalProperties": false,
+        "required": ["value"]
+      }
+    }
+  },
+  "commands": {}
+}

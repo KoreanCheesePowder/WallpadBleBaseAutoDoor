@@ -1,0 +1,21 @@
+name: ble-door-presence
+components:
+  - id: main
+    capabilities:
+      - id: __DOOR_PROXIMITY_CAPABILITY_ID__
+        version: 1
+      - id: presenceSensor
+        version: 1
+      - id: __PHONE_COUNT_CAPABILITY_ID__
+        version: 1
+      - id: __PHONE_PAIRING_CAPABILITY_ID__
+        version: 1
+      - id: __DRIVER_INFO_CAPABILITY_ID__
+        version: 1
+      - id: refresh
+        version: 1
+    categories:
+      - name: PresenceSensor
+metadata:
+  vid: __PRESENTATION_ID__
+  mnmn: __MANUFACTURER_NAME__

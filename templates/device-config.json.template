@@ -1,0 +1,72 @@
+{
+  "type": "profile",
+  "dashboard": {
+    "states": [
+      {
+        "component": "main",
+        "capability": "__DOOR_PROXIMITY_CAPABILITY_ID__",
+        "version": 1,
+        "idx": 0,
+        "group": "main",
+        "values": [],
+        "composite": true
+      }
+    ],
+    "actions": [],
+    "basicPlus": []
+  },
+  "detailView": [
+    {
+      "component": "main",
+      "capability": "__DOOR_PROXIMITY_CAPABILITY_ID__",
+      "version": 1,
+      "values": [],
+      "patch": []
+    },
+    {
+      "component": "main",
+      "capability": "__PHONE_COUNT_CAPABILITY_ID__",
+      "version": 1,
+      "values": [],
+      "patch": []
+    },
+    {
+      "component": "main",
+      "capability": "__PHONE_PAIRING_CAPABILITY_ID__",
+      "version": 1,
+      "values": [],
+      "patch": []
+    },
+    {
+      "component": "main",
+      "capability": "__DRIVER_INFO_CAPABILITY_ID__",
+      "version": 1,
+      "values": [],
+      "patch": []
+    },
+    {
+      "component": "main",
+      "capability": "refresh",
+      "version": 1,
+      "values": [],
+      "patch": []
+    }
+  ],
+  "automation": {
+    "conditions": [
+      {
+        "component": "main",
+        "capability": "__DOOR_PROXIMITY_CAPABILITY_ID__",
+        "version": 1,
+        "values": []
+      },
+      {
+        "component": "main",
+        "capability": "presenceSensor",
+        "version": 1,
+        "values": []
+      }
+    ],
+    "actions": []
+  }
+}

@@ -1,0 +1,5 @@
+name: C.P BLE Door Presence
+packageKey: cp-ble-door-presence-discovery
+permissions:
+  lan: {}
+  discovery: {}

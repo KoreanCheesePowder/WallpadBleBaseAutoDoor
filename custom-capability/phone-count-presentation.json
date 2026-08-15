@@ -1,0 +1,20 @@
+{
+  "dashboard": {
+    "states": [],
+    "actions": [],
+    "basicPlus": []
+  },
+  "detailView": [
+    {
+      "label": "등록된 핸드폰 개수",
+      "displayType": "state",
+      "state": {
+        "label": "{{count.value}}대 / 최대 4대"
+      }
+    }
+  ],
+  "automation": {
+    "conditions": [],
+    "actions": []
+  }
+}

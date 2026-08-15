@@ -1,0 +1,21 @@
+name: ble-door-presence
+components:
+  - id: main
+    capabilities:
+      - id: buildbook37604.doorProximity
+        version: 1
+      - id: presenceSensor
+        version: 1
+      - id: buildbook37604.registeredPhones
+        version: 1
+      - id: buildbook37604.phonePairing
+        version: 1
+      - id: buildbook37604.driverInformation
+        version: 1
+      - id: refresh
+        version: 1
+    categories:
+      - name: PresenceSensor
+metadata:
+  vid: 579bedf1-5ba1-3e8d-b2bd-2e70f1f24319
+  mnmn: SmartThingsCommunity

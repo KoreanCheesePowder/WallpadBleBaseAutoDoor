@@ -1,0 +1,34 @@
+{
+  "name": "Phone Pairing",
+  "attributes": {
+    "passkey": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "value": { "type": "string" }
+        },
+        "additionalProperties": false,
+        "required": ["value"]
+      }
+    },
+    "status": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "enum": ["idle", "pairing", "success", "full", "timeout", "error"]
+          }
+        },
+        "additionalProperties": false,
+        "required": ["value"]
+      }
+    }
+  },
+  "commands": {
+    "startPairing": {
+      "name": "startPairing",
+      "arguments": []
+    }
+  }
+}

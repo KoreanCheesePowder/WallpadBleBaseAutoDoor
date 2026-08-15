@@ -1,0 +1,16 @@
+{
+  "name": "Registered Phones",
+  "attributes": {
+    "count": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "value": { "type": "integer", "minimum": 0, "maximum": 4 }
+        },
+        "additionalProperties": false,
+        "required": ["value"]
+      }
+    }
+  },
+  "commands": {}
+}

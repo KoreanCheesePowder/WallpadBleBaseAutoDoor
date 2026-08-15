@@ -1,0 +1,29 @@
+{
+  "name": "Door Proximity",
+  "attributes": {
+    "rssi": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "value": { "type": "integer" }
+        },
+        "additionalProperties": false,
+        "required": ["value"]
+      }
+    },
+    "state": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "enum": ["near", "away", "unregistered", "offline"]
+          }
+        },
+        "additionalProperties": false,
+        "required": ["value"]
+      }
+    }
+  },
+  "commands": {}
+}

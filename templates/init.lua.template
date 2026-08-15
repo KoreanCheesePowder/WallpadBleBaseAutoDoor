@@ -1,0 +1,584 @@
+local Driver = require "st.driver"
+local capabilities = require "st.capabilities"
+local log = require "log"
+local cosock = require "cosock"
+local socket = require "cosock.socket"
+
+local door_proximity = capabilities["__DOOR_PROXIMITY_CAPABILITY_ID__"]
+local phone_count = capabilities["__PHONE_COUNT_CAPABILITY_ID__"]
+local phone_pairing = capabilities["__PHONE_PAIRING_CAPABILITY_ID__"]
+local driver_info = capabilities["__DRIVER_INFO_CAPABILITY_ID__"]
+
+local ESP_IP = "192.168.1.101"
+local ESP_PORT = 8900
+local DEVICE_DNI = "cp-ble-door-presence-192.168.1.101"
+local DEVICE_PROFILE = "ble-door-presence"
+local DRIVER_VERSION = "v1.1.6"
+local AUTHOR = "치즈가루"
+local POLL_INTERVAL_SEC = 5.0
+local STATUS_TIMEOUT_SEC = 4.0
+local UI_HEARTBEAT_SEC = 5.0
+local RECONNECT_DELAY_SEC = 2
+
+local FIELD_WORKER_STARTED = "ble_worker_started"
+local FIELD_SOCKET = "ble_socket"
+local FIELD_CONNECTED = "ble_connected"
+local FIELD_BOND_COUNT = "bond_count"
+local FIELD_ANY_NEAR = "any_near"
+local FIELD_REMOVED = "removed"
+local FIELD_IN_STATUS = "in_status"
+local FIELD_LAST_EMIT_RSSI = "last_emit_rssi"
+local FIELD_LAST_EMIT_STATE = "last_emit_state"
+local FIELD_LAST_EMIT_PRESENCE = "last_emit_presence"
+local FIELD_LAST_EMIT_COUNT = "last_emit_count"
+local FIELD_LAST_UI_SYNC = "last_ui_sync"
+local FIELD_STATUS_PENDING = "status_pending"
+local FIELD_STATUS_SENT_AT = "status_sent_at"
+
+local function send_line(device, line)
+  local sock = device:get_field(FIELD_SOCKET)
+  if sock == nil then
+    return false, "not connected"
+  end
+
+  local ok, err = sock:send(line .. "\n")
+  if ok == nil then
+    return false, err
+  end
+  return true
+end
+
+
+local function field_number(device, key, default_value)
+  local value = device:get_field(key)
+  if value == nil then
+    return default_value
+  end
+
+  local number = tonumber(value)
+  if number == nil then
+    return default_value
+  end
+
+  return number
+end
+
+local function emit_static_info(device)
+  device:emit_event(phone_pairing.passkey("123456"))
+  device:emit_event(driver_info.author(AUTHOR))
+  device:emit_event(driver_info.driverVersion(DRIVER_VERSION))
+end
+
+local function now_sec()
+  return (socket.gettime and socket.gettime()) or os.time()
+end
+
+local function emit_count_if_changed(device, count)
+  if device:get_field(FIELD_LAST_EMIT_COUNT) ~= count then
+    device:set_field(FIELD_LAST_EMIT_COUNT, count)
+    device:emit_event(phone_count.count(count))
+  end
+end
+
+local function emit_presence_if_changed(device, value)
+  if device:get_field(FIELD_LAST_EMIT_PRESENCE) ~= value then
+    device:set_field(FIELD_LAST_EMIT_PRESENCE, value)
+    if value == "present" then
+      device:emit_event(capabilities.presenceSensor.presence.present())
+    else
+      device:emit_event(capabilities.presenceSensor.presence.not_present())
+    end
+  end
+end
+
+local function compute_display(device)
+  local count = math.max(0, math.min(4, field_number(device, FIELD_BOND_COUNT, 0)))
+  local connected = device:get_field(FIELD_CONNECTED) == true
+  local found_any = false
+  local near_any = false
+  local best = nil
+
+  for i = 1, count do
+    local ema = field_number(device, "phone" .. i .. "_ema", nil)
+    local raw = field_number(device, "phone" .. i .. "_rssi", nil)
+    local candidate = nil
+
+    -- v1.1.5: 같은 시점의 LOST=true이면 과거 RSSI를 절대 재사용하지 않는다.
+    -- 반대로 실시간 RSSI/EMA가 들어오면 parse_line에서 LOST=false로 즉시 복구한다.
+    local lost = device:get_field("phone" .. i .. "_lost") == true
+    if not lost then
+      if ema ~= nil and ema > -127 and ema < 0 then
+        candidate = ema
+      elseif raw ~= nil and raw > -127 and raw < 0 then
+        candidate = raw
+      end
+    end
+
+    if candidate ~= nil then
+      found_any = true
+      if device:get_field("phone" .. i .. "_near") == true then
+        near_any = true
+      end
+      if best == nil or candidate > best then
+        best = candidate
+      end
+    end
+  end
+
+  local display_rssi = 0
+  local display_state = "offline" -- presentation에서 '못찾음'으로 표시
+  local display_presence = "not present"
+
+  if count == 0 then
+    display_state = "unregistered"
+  elseif connected and found_any and best ~= nil then
+    if best >= 0 then
+      display_rssi = math.floor(best + 0.5)
+    else
+      display_rssi = math.ceil(best - 0.5)
+    end
+
+    if near_any then
+      display_state = "near"
+      display_presence = "present"
+    else
+      display_state = "away"
+    end
+  end
+
+  return count, display_rssi, display_state, display_presence
+end
+
+local function emit_aggregate(device, force_pair)
+  local count, display_rssi, display_state, display_presence = compute_display(device)
+  emit_count_if_changed(device, count)
+
+  local last_rssi = device:get_field(FIELD_LAST_EMIT_RSSI)
+  local last_state = device:get_field(FIELD_LAST_EMIT_STATE)
+  local changed = (last_rssi ~= display_rssi) or (last_state ~= display_state)
+  local now = now_sec()
+  local last_sync = field_number(device, FIELD_LAST_UI_SYNC, 0)
+  local heartbeat_due = (now - last_sync) >= UI_HEARTBEAT_SEC
+
+  -- 거리와 상태를 항상 한 쌍으로 다시 보낸다.
+  -- 값이 바뀌거나 1초 동기화 주기가 되면 둘 다 전송하므로,
+  -- 앱이 한 이벤트를 놓쳐도 -91/못찾음 또는 0/멀어짐에 고착되지 않는다.
+  if changed or force_pair or heartbeat_due then
+    device:emit_event(door_proximity.rssi(display_rssi))
+    device:emit_event(door_proximity.state(display_state))
+    device:set_field(FIELD_LAST_EMIT_RSSI, display_rssi)
+    device:set_field(FIELD_LAST_EMIT_STATE, display_state)
+    device:set_field(FIELD_LAST_UI_SYNC, now)
+  end
+
+  emit_presence_if_changed(device, display_presence)
+end
+
+local function clear_status_stage(device)
+  device:set_field("status_bond_count", nil)
+  device:set_field("status_any_near", nil)
+  for i = 1, 4 do
+    device:set_field("status_phone" .. i .. "_addr", nil)
+    device:set_field("status_phone" .. i .. "_near", nil)
+    device:set_field("status_phone" .. i .. "_lost", nil)
+    device:set_field("status_phone" .. i .. "_rssi", nil)
+    device:set_field("status_phone" .. i .. "_ema", nil)
+  end
+end
+
+local function commit_status_stage(device)
+  local staged_count = device:get_field("status_bond_count")
+  if staged_count ~= nil then
+    device:set_field(FIELD_BOND_COUNT, staged_count)
+  end
+
+  local staged_any = device:get_field("status_any_near")
+  if staged_any ~= nil then
+    device:set_field(FIELD_ANY_NEAR, staged_any)
+  end
+
+  local count = math.max(0, math.min(4, field_number(device, FIELD_BOND_COUNT, 0)))
+  for i = 1, 4 do
+    local addr = device:get_field("status_phone" .. i .. "_addr")
+    local near = device:get_field("status_phone" .. i .. "_near")
+    local lost = device:get_field("status_phone" .. i .. "_lost")
+    local raw = device:get_field("status_phone" .. i .. "_rssi")
+    local ema = device:get_field("status_phone" .. i .. "_ema")
+
+    if addr ~= nil then device:set_field("phone" .. i .. "_addr", addr) end
+    if near ~= nil then device:set_field("phone" .. i .. "_near", near) end
+    if lost ~= nil then device:set_field("phone" .. i .. "_lost", lost) end
+    if raw ~= nil then device:set_field("phone" .. i .. "_rssi", raw) end
+    if ema ~= nil then device:set_field("phone" .. i .. "_ema", ema) end
+
+    -- STATUS 한 프레임 안에서는 LOST 플래그를 우선한다.
+    -- LOST=1이면 같은 프레임에 남아 있는 과거 RSSI/EMA를 폐기한다.
+    -- LOST=0일 때만 유효 RSSI/EMA를 사용한다.
+    local final_lost = device:get_field("phone" .. i .. "_lost") == true
+    if final_lost then
+      device:set_field("phone" .. i .. "_rssi", -127)
+      device:set_field("phone" .. i .. "_ema", -127)
+      device:set_field("phone" .. i .. "_near", false)
+    else
+      local final_raw = field_number(device, "phone" .. i .. "_rssi", -127)
+      local final_ema = field_number(device, "phone" .. i .. "_ema", -127)
+      if i <= count and ((final_raw > -127 and final_raw < 0) or (final_ema > -127 and final_ema < 0)) then
+        device:set_field("phone" .. i .. "_lost", false)
+      end
+    end
+  end
+end
+
+local function parse_line(device, line)
+  if line == nil or line == "" then
+    return
+  end
+
+  log.debug(string.format("ESP <= %s", line))
+
+  if line == "STATUS_BEGIN" or line:match("^STATUS_BEGINSTATUS_BEGIN+$") then
+    -- 중복 BEGIN 문자열이 합쳐져 들어와도 한 번의 프레임 시작으로 정규화한다.
+    clear_status_stage(device)
+    device:set_field(FIELD_IN_STATUS, true)
+    return
+  elseif line == "STATUS_END" then
+    if device:get_field(FIELD_IN_STATUS) == true then
+      commit_status_stage(device)
+    end
+    device:set_field(FIELD_IN_STATUS, false)
+    device:set_field(FIELD_STATUS_PENDING, false)
+    emit_aggregate(device, true)
+    return
+  elseif line == "HELLO=WALLPAD_BLE" then
+    return
+  end
+
+  local key, value = line:match("^([^=]+)=(.*)$")
+  if key == nil then
+    return
+  end
+
+  local in_status = device:get_field(FIELD_IN_STATUS) == true
+  local prefix = in_status and "status_" or ""
+
+  if key == "BOND_COUNT" then
+    local n = tonumber(value) or 0
+    n = math.max(0, math.min(4, n))
+    if in_status then
+      device:set_field("status_bond_count", n)
+    else
+      device:set_field(FIELD_BOND_COUNT, n)
+      emit_aggregate(device, true)
+    end
+    if n >= 4 then
+      device:emit_event(phone_pairing.status("full"))
+    end
+    return
+  end
+
+  if key == "PAIRING" then
+    if value == "1" then
+      device:emit_event(phone_pairing.status("pairing"))
+    else
+      local n = field_number(device, FIELD_BOND_COUNT, 0)
+      device:emit_event(phone_pairing.status(n >= 4 and "full" or "idle"))
+    end
+    return
+  end
+
+  if key == "PAIR_PASSKEY" then
+    device:emit_event(phone_pairing.passkey(value))
+    return
+  end
+
+  if key == "PAIR_SUCCESS" and value == "1" then
+    device:emit_event(phone_pairing.status("success"))
+    device:set_field(FIELD_STATUS_PENDING, false)
+    return
+  end
+
+  if key == "PAIR_TIMEOUT" and value == "1" then
+    device:emit_event(phone_pairing.status("timeout"))
+    return
+  end
+
+  if key == "ERR" then
+    if value == "PAIR_FULL" then
+      device:emit_event(phone_pairing.status("full"))
+    else
+      device:emit_event(phone_pairing.status("error"))
+    end
+    return
+  end
+
+  if key == "ANY_NEAR" then
+    if in_status then
+      device:set_field("status_any_near", value == "1")
+    else
+      device:set_field(FIELD_ANY_NEAR, value == "1")
+    end
+    return
+  end
+
+  local phone_idx, suffix = key:match("^PHONE([1-4])_(.+)$")
+  if phone_idx ~= nil then
+    local i = tonumber(phone_idx)
+    local base = prefix .. "phone" .. i .. "_"
+
+    if suffix == "RSSI" then
+      local n = tonumber(value) or -127
+      device:set_field(base .. "rssi", n)
+      if not in_status and n > -127 and n < 0 then
+        device:set_field("phone" .. i .. "_lost", false)
+        emit_aggregate(device, true)
+      end
+    elseif suffix == "EMA" then
+      local n = tonumber(value) or -127
+      device:set_field(base .. "ema", n)
+      if not in_status and n > -127 and n < 0 then
+        device:set_field("phone" .. i .. "_lost", false)
+        emit_aggregate(device, true)
+      end
+    elseif suffix == "NEAR" then
+      device:set_field(base .. "near", value == "1")
+      if not in_status and device:get_field("phone" .. i .. "_lost") ~= true then
+        emit_aggregate(device, true)
+      end
+    elseif suffix == "LOST" then
+      local lost = value == "1"
+      device:set_field(base .. "lost", lost)
+      if not in_status then
+        device:set_field("phone" .. i .. "_lost", lost)
+        if lost then
+          device:set_field("phone" .. i .. "_rssi", -127)
+          device:set_field("phone" .. i .. "_ema", -127)
+          device:set_field("phone" .. i .. "_near", false)
+          emit_aggregate(device, true)
+        end
+        -- LOST=0만 먼저 들어온 경우에는 실제 샘플을 기다린다.
+      end
+    elseif suffix == "ADDR" then
+      device:set_field(base .. "addr", value)
+      if not in_status then device:set_field("phone" .. i .. "_addr", value) end
+    end
+    return
+  end
+end
+
+local function request_status(device)
+  if device:get_field(FIELD_STATUS_PENDING) == true then
+    return true
+  end
+  local ok, err = send_line(device, "STATUS")
+  if ok then
+    device:set_field(FIELD_STATUS_PENDING, true)
+    device:set_field(FIELD_STATUS_SENT_AT, now_sec())
+  end
+  return ok, err
+end
+
+local function connection_worker(device)
+  while not device:get_field(FIELD_REMOVED) do
+    local sock = socket.tcp()
+    sock:settimeout(3)
+
+    log.info(string.format("Connecting to ESP BLE control %s:%d", ESP_IP, ESP_PORT))
+    local ok, err = sock:connect(ESP_IP, ESP_PORT)
+
+    if ok then
+      log.info("ESP BLE control connected")
+      device:set_field(FIELD_SOCKET, sock)
+      device:set_field(FIELD_CONNECTED, true)
+      device:set_field(FIELD_STATUS_PENDING, false)
+      device:set_field(FIELD_IN_STATUS, false)
+      sock:settimeout(0.20)
+      emit_static_info(device)
+
+      local last_poll = 0
+      request_status(device)
+
+      while true do
+        local now = now_sec()
+        local pending = device:get_field(FIELD_STATUS_PENDING) == true
+        local sent_at = field_number(device, FIELD_STATUS_SENT_AT, 0)
+
+        -- STATUS는 5초 간격의 보조 동기화만 사용한다.
+        -- RSSI/LOST/NEAR 실시간 라인은 즉시 UI에 반영하며, 응답 중에는 재요청하지 않는다.
+        if pending and (now - sent_at) > STATUS_TIMEOUT_SEC then
+          log.warn("STATUS response timeout; resetting frame")
+          device:set_field(FIELD_STATUS_PENDING, false)
+          device:set_field(FIELD_IN_STATUS, false)
+          clear_status_stage(device)
+          pending = false
+        end
+
+        if not pending and (now - last_poll) >= POLL_INTERVAL_SEC then
+          local sent, send_err = request_status(device)
+          if not sent then
+            log.warn(string.format("STATUS send failed: %s", tostring(send_err)))
+            break
+          end
+          last_poll = now
+        end
+
+        local line, recv_err, partial = sock:receive("*l")
+        if line ~= nil then
+          parse_line(device, line)
+        elseif partial ~= nil and partial ~= "" then
+          parse_line(device, partial)
+        elseif recv_err ~= "timeout" then
+          log.warn(string.format("ESP connection closed: %s", tostring(recv_err)))
+          break
+        end
+      end
+    else
+      log.warn(string.format("ESP connect failed: %s", tostring(err)))
+    end
+
+    pcall(function() sock:close() end)
+    device:set_field(FIELD_SOCKET, nil)
+    device:set_field(FIELD_CONNECTED, false)
+    device:set_field(FIELD_STATUS_PENDING, false)
+    device:set_field(FIELD_IN_STATUS, false)
+    clear_status_stage(device)
+    emit_aggregate(device, true)
+    if not device:get_field(FIELD_REMOVED) then
+      socket.sleep(RECONNECT_DELAY_SEC)
+    end
+  end
+end
+
+local function ensure_worker(device)
+  if device:get_field(FIELD_WORKER_STARTED) then
+    return
+  end
+  device:set_field(FIELD_WORKER_STARTED, true)
+  cosock.spawn(function()
+    connection_worker(device)
+  end, "cp-ble-door-presence-connection")
+end
+
+local function added_handler(driver, device)
+  device:set_field(FIELD_REMOVED, false)
+  device:set_field(FIELD_BOND_COUNT, 0)
+  device:set_field(FIELD_ANY_NEAR, false)
+  device:set_field(FIELD_CONNECTED, false)
+  device:set_field(FIELD_IN_STATUS, false)
+  device:set_field(FIELD_LAST_EMIT_RSSI, nil)
+  device:set_field(FIELD_LAST_EMIT_STATE, nil)
+  device:set_field(FIELD_LAST_EMIT_PRESENCE, nil)
+  device:set_field(FIELD_LAST_EMIT_COUNT, nil)
+  device:set_field(FIELD_LAST_UI_SYNC, 0)
+  device:set_field(FIELD_STATUS_PENDING, false)
+  device:set_field(FIELD_STATUS_SENT_AT, 0)
+  for i = 1, 4 do
+    device:set_field("phone" .. i .. "_lost", true)
+    device:set_field("phone" .. i .. "_rssi", -127)
+    device:set_field("phone" .. i .. "_ema", -127)
+  end
+  device:emit_event(phone_pairing.status("idle"))
+  emit_aggregate(device)
+  emit_static_info(device)
+  ensure_worker(device)
+end
+
+local function init_handler(driver, device)
+  device:set_field(FIELD_REMOVED, false)
+  emit_static_info(device)
+  ensure_worker(device)
+end
+
+local function removed_handler(driver, device)
+  device:set_field(FIELD_REMOVED, true)
+  local sock = device:get_field(FIELD_SOCKET)
+  if sock ~= nil then
+    pcall(function() sock:close() end)
+  end
+end
+
+local function refresh_handler(driver, device, command)
+  local ok, err = request_status(device)
+  if not ok then
+    log.warn(string.format("Refresh failed: %s", tostring(err)))
+  end
+end
+
+local function start_pairing_handler(driver, device, command)
+  local count = field_number(device, FIELD_BOND_COUNT, 0)
+  if count >= 4 then
+    device:emit_event(phone_pairing.status("full"))
+    return
+  end
+
+  local ok, err = send_line(device, "PAIR_START")
+  if ok then
+    device:emit_event(phone_pairing.status("pairing"))
+  else
+    log.warn(string.format("PAIR_START failed: %s", tostring(err)))
+    device:emit_event(phone_pairing.status("error"))
+  end
+end
+
+local function discovery_handler(driver, opts, should_continue)
+  log.info("[DISCOVERY] START")
+  log.info(string.format("[DISCOVERY] Trying ESP %s:%d", ESP_IP, ESP_PORT))
+
+  local sock = socket.tcp()
+  sock:settimeout(2)
+  local ok, err = sock:connect(ESP_IP, ESP_PORT)
+  if not ok then
+    log.warn(string.format("[DISCOVERY] TCP connect failed: %s", tostring(err)))
+    pcall(function() sock:close() end)
+    return
+  end
+
+  log.info("[DISCOVERY] TCP connected")
+  sock:settimeout(2)
+  local line = sock:receive("*l")
+  log.info(string.format("[DISCOVERY] Response: %s", tostring(line)))
+  pcall(function() sock:close() end)
+
+  if line ~= nil and (line == "HELLO=WALLPAD_BLE" or line == "STATUS_BEGIN" or line:match("^BOND_COUNT=")) then
+    log.info("[DISCOVERY] ESP WALLPAD BLE control service found")
+    log.info("[DISCOVERY] Creating device...")
+    driver:try_create_device({
+      type = "LAN",
+      device_network_id = DEVICE_DNI,
+      label = "현관 BLE Presence",
+      profile = DEVICE_PROFILE,
+      manufacturer = "치즈가루",
+      model = "ESP32-S3 BLE Presence",
+      vendor_provided_label = "현관 BLE Presence"
+    })
+  else
+    log.warn(string.format("[DISCOVERY] Unexpected response: %s", tostring(line)))
+  end
+end
+
+local driver_template = {
+  discovery = discovery_handler,
+  supported_capabilities = {
+    door_proximity,
+    capabilities.presenceSensor,
+    phone_count,
+    phone_pairing,
+    driver_info,
+    capabilities.refresh
+  },
+  lifecycle_handlers = {
+    added = added_handler,
+    init = init_handler,
+    removed = removed_handler
+  },
+  capability_handlers = {
+    [capabilities.refresh.ID] = {
+      [capabilities.refresh.commands.refresh.NAME] = refresh_handler
+    },
+    [phone_pairing.ID] = {
+      [phone_pairing.commands.startPairing.NAME] = start_pairing_handler
+    }
+  }
+}
+
+local driver = Driver("cp-ble-door-presence", driver_template)
+driver:run()

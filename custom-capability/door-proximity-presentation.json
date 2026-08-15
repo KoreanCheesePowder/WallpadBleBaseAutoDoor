@@ -1,0 +1,108 @@
+{
+  "dashboard": {
+    "states": [
+      {
+        "label": "{{rssi.value}} dBm | {{state.value}}",
+        "alternatives": [
+          {
+            "key": "near",
+            "value": "가까움",
+            "type": "active"
+          },
+          {
+            "key": "away",
+            "value": "멀어짐",
+            "type": "inactive"
+          },
+          {
+            "key": "unregistered",
+            "value": "미등록",
+            "type": "inactive"
+          },
+          {
+            "key": "offline",
+            "value": "못찾음",
+            "type": "inactive"
+          }
+        ]
+      }
+    ],
+    "actions": [],
+    "basicPlus": []
+  },
+  "detailView": [
+    {
+      "label": "거리",
+      "displayType": "state",
+      "state": {
+        "label": "{{rssi.value}} dBm"
+      }
+    },
+    {
+      "label": "상태",
+      "displayType": "state",
+      "state": {
+        "label": "{{state.value}}",
+        "alternatives": [
+          {
+            "key": "near",
+            "value": "가까움",
+            "type": "active"
+          },
+          {
+            "key": "away",
+            "value": "멀어짐",
+            "type": "inactive"
+          },
+          {
+            "key": "unregistered",
+            "value": "미등록",
+            "type": "inactive"
+          },
+          {
+            "key": "offline",
+            "value": "못찾음",
+            "type": "inactive"
+          }
+        ]
+      }
+    }
+  ],
+  "automation": {
+    "conditions": [
+      {
+        "label": "현관문과의 거리 (RSSI)",
+        "displayType": "numberField",
+        "numberField": {
+          "value": "rssi.value",
+          "range": [
+            -127,
+            0
+          ]
+        }
+      },
+      {
+        "label": "상태",
+        "displayType": "list",
+        "list": {
+          "value": "state.value",
+          "alternatives": [
+            {
+              "key": "near",
+              "value": "가까움"
+            },
+            {
+              "key": "away",
+              "value": "멀어짐"
+            },
+            {
+              "key": "offline",
+              "value": "못찾음"
+            }
+          ]
+        }
+      }
+    ],
+    "actions": []
+  }
+}
