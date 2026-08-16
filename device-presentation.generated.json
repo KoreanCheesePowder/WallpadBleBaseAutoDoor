@@ -1,6 +1,6 @@
 {
     "mnmn": "SmartThingsCommunity",
-    "vid": "272cce1e-acbe-3032-a7fe-5dfab66f94f8",
+    "vid": "a619369e-62f2-38a7-96fb-2bcaa6fe870a",
     "version": "0.0.1",
     "type": "profile",
     "dashboard": {
@@ -25,6 +25,78 @@
             "version": 1,
             "values": [],
             "patch": []
+        },
+        {
+            "component": "phone1",
+            "capability": "buildbook37604.doorProximity",
+            "version": 1,
+            "values": [],
+            "patch": [
+                {
+                    "op": "replace",
+                    "path": "/0/label",
+                    "value": "핸드폰 1 거리"
+                },
+                {
+                    "op": "replace",
+                    "path": "/1/label",
+                    "value": "핸드폰 1 상태"
+                }
+            ]
+        },
+        {
+            "component": "phone2",
+            "capability": "buildbook37604.doorProximity",
+            "version": 1,
+            "values": [],
+            "patch": [
+                {
+                    "op": "replace",
+                    "path": "/0/label",
+                    "value": "핸드폰 2 거리"
+                },
+                {
+                    "op": "replace",
+                    "path": "/1/label",
+                    "value": "핸드폰 2 상태"
+                }
+            ]
+        },
+        {
+            "component": "phone3",
+            "capability": "buildbook37604.doorProximity",
+            "version": 1,
+            "values": [],
+            "patch": [
+                {
+                    "op": "replace",
+                    "path": "/0/label",
+                    "value": "핸드폰 3 거리"
+                },
+                {
+                    "op": "replace",
+                    "path": "/1/label",
+                    "value": "핸드폰 3 상태"
+                }
+            ]
+        },
+        {
+            "component": "phone4",
+            "capability": "buildbook37604.doorProximity",
+            "version": 1,
+            "values": [],
+            "patch": [
+                {
+                    "op": "replace",
+                    "path": "/0/label",
+                    "value": "핸드폰 4 거리"
+                },
+                {
+                    "op": "replace",
+                    "path": "/1/label",
+                    "value": "핸드폰 4 상태"
+                }
+            ]
         },
         {
             "component": "main",
@@ -79,6 +151,38 @@
                 "exclusion": []
             },
             {
+                "component": "phone1",
+                "capability": "buildbook37604.doorProximity",
+                "version": 1,
+                "values": [],
+                "patch": [],
+                "exclusion": []
+            },
+            {
+                "component": "phone2",
+                "capability": "buildbook37604.doorProximity",
+                "version": 1,
+                "values": [],
+                "patch": [],
+                "exclusion": []
+            },
+            {
+                "component": "phone3",
+                "capability": "buildbook37604.doorProximity",
+                "version": 1,
+                "values": [],
+                "patch": [],
+                "exclusion": []
+            },
+            {
+                "component": "phone4",
+                "capability": "buildbook37604.doorProximity",
+                "version": 1,
+                "values": [],
+                "patch": [],
+                "exclusion": []
+            },
+            {
                 "component": "main",
                 "capability": "presenceSensor",
                 "version": 1,
@@ -89,6 +193,6 @@
         ],
         "actions": []
     },
-    "presentationId": "272cce1e-acbe-3032-a7fe-5dfab66f94f8",
+    "presentationId": "a619369e-62f2-38a7-96fb-2bcaa6fe870a",
     "manufacturerName": "SmartThingsCommunity"
 }

@@ -58,7 +58,7 @@ v1.1.7 FIXED
 - Setup updates phonePairing capability schema before presentation.
 
 
-v1.2.1
+v1.3.1
 - Adds a separate Current Phone Delete custom capability so the button renders as its own detail-view card.
 - Button label: 현재 핸드폰 삭제
 - Safety: SmartThings Edge does not reveal which physical handset pressed a command. The driver never guesses.
@@ -66,10 +66,26 @@ v1.2.1
 - Uses ESP V8 command UNPAIR <slot>. No ESP firmware change is required.
 
 
-v1.2.1
+v1.3.1
 - 403을 발생시키던 currentPhoneDelete custom capability 생성 제거
 - SmartThings 표준 momentary push 버튼으로 현재 핸드폰 삭제 구현
 - 버튼 처리 시 ESP V8에 UNPAIR n 전송
 
 
-v1.2.1 삭제 방식: SmartThings 기기 설정에서 삭제할 핸드폰 1~4를 선택한 뒤 상세화면의 선택한 핸드폰 삭제 버튼을 누르면 ESP에 UNPAIR n을 전송합니다. 신규 custom capability/command를 만들지 않습니다.
+v1.3.1 삭제 방식: SmartThings 기기 설정에서 삭제할 핸드폰 1~4를 선택한 뒤 상세화면의 선택한 핸드폰 삭제 버튼을 누르면 ESP에 UNPAIR n을 전송합니다. 신규 custom capability/command를 만들지 않습니다.
+
+
+v1.3.1 변경사항
+- 상세화면에 핸드폰 1~4 거리/RSSI와 상태를 각각 표시합니다.
+- PHONE1_RSSI~PHONE4_RSSI, EMA, LOST, NEAR 값을 각 슬롯 카드에 독립 반영합니다.
+- 미등록 슬롯은 0 dBm / 미등록, 등록 후 신호 미수신은 -127 dBm / 못찾음으로 표시합니다.
+- 기존 전체 거리/상태/재실 센서는 유지합니다.
+- 폰별 거리/상태를 자동화 조건에서도 선택할 수 있도록 phone1~phone4 component를 추가했습니다.
+- 귀가 전용 일회성 이벤트는 다음 ESP 펌웨어와 함께 추가 예정입니다.
+
+
+v1.3.1 상태 표시 수정
+- STATUS_END마다 phone1~phone4의 거리와 상태를 강제 동기화합니다.
+- 등록폰: 가까움 / 멀어짐 / 못찾음
+- 미등록 슬롯: 미등록
+- ESP V9 이하에서도 기존 PHONE*_NEAR/LOST/RSSI/EMA 데이터로 동작합니다.

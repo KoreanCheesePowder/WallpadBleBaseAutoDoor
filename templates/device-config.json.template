@@ -24,6 +24,46 @@
       "patch": []
     },
     {
+      "component": "phone1",
+      "capability": "__DOOR_PROXIMITY_CAPABILITY_ID__",
+      "version": 1,
+      "values": [],
+      "patch": [
+        {"op": "replace", "path": "/0/label", "value": "핸드폰 1 거리"},
+        {"op": "replace", "path": "/1/label", "value": "핸드폰 1 상태"}
+      ]
+    },
+    {
+      "component": "phone2",
+      "capability": "__DOOR_PROXIMITY_CAPABILITY_ID__",
+      "version": 1,
+      "values": [],
+      "patch": [
+        {"op": "replace", "path": "/0/label", "value": "핸드폰 2 거리"},
+        {"op": "replace", "path": "/1/label", "value": "핸드폰 2 상태"}
+      ]
+    },
+    {
+      "component": "phone3",
+      "capability": "__DOOR_PROXIMITY_CAPABILITY_ID__",
+      "version": 1,
+      "values": [],
+      "patch": [
+        {"op": "replace", "path": "/0/label", "value": "핸드폰 3 거리"},
+        {"op": "replace", "path": "/1/label", "value": "핸드폰 3 상태"}
+      ]
+    },
+    {
+      "component": "phone4",
+      "capability": "__DOOR_PROXIMITY_CAPABILITY_ID__",
+      "version": 1,
+      "values": [],
+      "patch": [
+        {"op": "replace", "path": "/0/label", "value": "핸드폰 4 거리"},
+        {"op": "replace", "path": "/1/label", "value": "핸드폰 4 상태"}
+      ]
+    },
+    {
       "component": "main",
       "capability": "__PHONE_COUNT_CAPABILITY_ID__",
       "version": 1,
@@ -69,6 +109,30 @@
     "conditions": [
       {
         "component": "main",
+        "capability": "__DOOR_PROXIMITY_CAPABILITY_ID__",
+        "version": 1,
+        "values": []
+      },
+      {
+        "component": "phone1",
+        "capability": "__DOOR_PROXIMITY_CAPABILITY_ID__",
+        "version": 1,
+        "values": []
+      },
+      {
+        "component": "phone2",
+        "capability": "__DOOR_PROXIMITY_CAPABILITY_ID__",
+        "version": 1,
+        "values": []
+      },
+      {
+        "component": "phone3",
+        "capability": "__DOOR_PROXIMITY_CAPABILITY_ID__",
+        "version": 1,
+        "values": []
+      },
+      {
+        "component": "phone4",
         "capability": "__DOOR_PROXIMITY_CAPABILITY_ID__",
         "version": 1,
         "values": []

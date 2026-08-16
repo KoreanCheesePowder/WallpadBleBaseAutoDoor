@@ -14,7 +14,7 @@ local ESP_IP = "192.168.1.101"
 local ESP_PORT = 8900
 local DEVICE_DNI = "cp-ble-door-presence-192.168.1.101"
 local DEVICE_PROFILE = "ble-door-presence"
-local DRIVER_VERSION = "v1.2.1"
+local DRIVER_VERSION = "v1.3.1"
 local AUTHOR = "치즈가루"
 local POLL_INTERVAL_SEC = 5.0
 local STATUS_TIMEOUT_SEC = 4.0
@@ -35,6 +35,67 @@ local FIELD_LAST_EMIT_COUNT = "last_emit_count"
 local FIELD_LAST_UI_SYNC = "last_ui_sync"
 local FIELD_STATUS_PENDING = "status_pending"
 local FIELD_STATUS_SENT_AT = "status_sent_at"
+
+local function phone_component(device, slot)
+  if device.profile == nil or device.profile.components == nil then
+    return nil
+  end
+  return device.profile.components["phone" .. tostring(slot)]
+end
+
+local function emit_phone_detail(device, slot, force)
+  local component = phone_component(device, slot)
+  if component == nil then
+    return
+  end
+
+  local count = tonumber(device:get_field(FIELD_BOND_COUNT)) or 0
+  count = math.max(0, math.min(4, count))
+  local registered = slot <= count and device:get_field("phone" .. slot .. "_addr") ~= nil
+  local rssi = 0
+  local state = "unregistered"
+
+  if registered then
+    local lost = device:get_field("phone" .. slot .. "_lost") == true
+    local ema = tonumber(device:get_field("phone" .. slot .. "_ema"))
+    local raw = tonumber(device:get_field("phone" .. slot .. "_rssi"))
+    if lost then
+      rssi = -127
+      state = "offline"
+    else
+      local candidate = nil
+      if ema ~= nil and ema > -127 and ema < 0 then
+        candidate = ema
+      elseif raw ~= nil and raw > -127 and raw < 0 then
+        candidate = raw
+      end
+      if candidate ~= nil then
+        if candidate >= 0 then rssi = math.floor(candidate + 0.5) else rssi = math.ceil(candidate - 0.5) end
+        state = device:get_field("phone" .. slot .. "_near") == true and "near" or "away"
+      else
+        rssi = -127
+        state = "offline"
+      end
+    end
+  end
+
+  local key_rssi = "phone" .. slot .. "_last_emit_rssi"
+  local key_state = "phone" .. slot .. "_last_emit_state"
+  if force or device:get_field(key_rssi) ~= rssi then
+    device:emit_component_event(component, door_proximity.rssi(rssi))
+    device:set_field(key_rssi, rssi)
+  end
+  if force or device:get_field(key_state) ~= state then
+    device:emit_component_event(component, door_proximity.state(state))
+    device:set_field(key_state, state)
+  end
+end
+
+local function emit_all_phone_details(device, force)
+  for i = 1, 4 do
+    emit_phone_detail(device, i, force)
+  end
+end
 
 local function send_line(device, line)
   local sock = device:get_field(FIELD_SOCKET)
@@ -248,6 +309,10 @@ local function parse_line(device, line)
     end
     device:set_field(FIELD_IN_STATUS, false)
     device:set_field(FIELD_STATUS_PENDING, false)
+    -- v1.3.1: STATUS 프레임이 끝날 때 폰별 RSSI와 state를 반드시 함께 emit한다.
+    -- v1.3.0에서는 aggregate만 강제 갱신되어 SmartThings 상세화면의
+    -- phone1~phone4 state가 초기/재연결 시 '-'로 남을 수 있었다.
+    emit_all_phone_details(device, true)
     emit_aggregate(device, true)
     return
   elseif line == "HELLO=WALLPAD_BLE" then
@@ -331,6 +396,7 @@ local function parse_line(device, line)
       device:set_field(base .. "rssi", n)
       if not in_status and n > -127 and n < 0 then
         device:set_field("phone" .. i .. "_lost", false)
+        emit_phone_detail(device, i, true)
         emit_aggregate(device, true)
       end
     elseif suffix == "EMA" then
@@ -338,11 +404,13 @@ local function parse_line(device, line)
       device:set_field(base .. "ema", n)
       if not in_status and n > -127 and n < 0 then
         device:set_field("phone" .. i .. "_lost", false)
+        emit_phone_detail(device, i, true)
         emit_aggregate(device, true)
       end
     elseif suffix == "NEAR" then
       device:set_field(base .. "near", value == "1")
       if not in_status and device:get_field("phone" .. i .. "_lost") ~= true then
+        emit_phone_detail(device, i, true)
         emit_aggregate(device, true)
       end
     elseif suffix == "LOST" then
@@ -354,6 +422,7 @@ local function parse_line(device, line)
           device:set_field("phone" .. i .. "_rssi", -127)
           device:set_field("phone" .. i .. "_ema", -127)
           device:set_field("phone" .. i .. "_near", false)
+          emit_phone_detail(device, i, true)
           emit_aggregate(device, true)
         end
         -- LOST=0만 먼저 들어온 경우에는 실제 샘플을 기다린다.
@@ -476,9 +545,12 @@ local function added_handler(driver, device)
     device:set_field("phone" .. i .. "_lost", true)
     device:set_field("phone" .. i .. "_rssi", -127)
     device:set_field("phone" .. i .. "_ema", -127)
+    device:set_field("phone" .. i .. "_last_emit_rssi", nil)
+    device:set_field("phone" .. i .. "_last_emit_state", nil)
   end
   device:emit_event(phone_pairing.status("idle"))
   emit_aggregate(device)
+  emit_all_phone_details(device, true)
   emit_static_info(device)
   ensure_worker(device)
 end

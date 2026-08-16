@@ -18,6 +18,22 @@ components:
         version: 1
     categories:
       - name: PresenceSensor
+  - id: phone1
+    capabilities:
+      - id: __DOOR_PROXIMITY_CAPABILITY_ID__
+        version: 1
+  - id: phone2
+    capabilities:
+      - id: __DOOR_PROXIMITY_CAPABILITY_ID__
+        version: 1
+  - id: phone3
+    capabilities:
+      - id: __DOOR_PROXIMITY_CAPABILITY_ID__
+        version: 1
+  - id: phone4
+    capabilities:
+      - id: __DOOR_PROXIMITY_CAPABILITY_ID__
+        version: 1
 metadata:
   vid: __PRESENTATION_ID__
   mnmn: __MANUFACTURER_NAME__
