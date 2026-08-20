@@ -109,8 +109,8 @@ Write-Host "Next: SmartThings app -> Add device -> Scan nearby." -ForegroundColo
 Write-Host "The driver probes ESP32-S3 at 192.168.1.101:8900 and creates one device." -ForegroundColor Green
 Write-Host "For an automation, use '거리 (RSSI)' or '가까움/멀어짐/못찾음'." -ForegroundColor Green
 Write-Host "가까움/멀어짐에서는 RSSI가 0에 가까울수록 가깝고, 못찾음에서는 거리값을 0으로 표시합니다." -ForegroundColor Yellow
-Write-Host "v1.3.1: 새 custom capability 생성 없이 SmartThings 표준 momentary 버튼을 사용해 현재 핸드폰 삭제 기능을 추가했습니다." -ForegroundColor Yellow
+Write-Host "v1.3.2: 새 custom capability 생성 없이 SmartThings 표준 momentary 버튼을 사용해 현재 핸드폰 삭제 기능을 추가했습니다." -ForegroundColor Yellow
 
-Write-Host "v1.3.1: 기기 설정에서 삭제할 핸드폰(1~4)을 선택한 뒤 상세화면의 선택한 핸드폰 삭제 버튼을 누르세요." -ForegroundColor Yellow
+Write-Host "v1.3.2: 기기 설정에서 삭제할 핸드폰(1~4)을 선택한 뒤 상세화면의 선택한 핸드폰 삭제 버튼을 누르세요." -ForegroundColor Yellow
 
-Write-Host "v1.3.1: 상세화면에 핸드폰 1~4 거리/상태를 각각 표시합니다. 신규 custom capability 생성은 하지 않습니다." -ForegroundColor Yellow
+Write-Host "v1.3.2: 상세화면에 핸드폰 1~4 거리/상태를 각각 표시합니다. 신규 custom capability 생성은 하지 않습니다." -ForegroundColor Yellow
