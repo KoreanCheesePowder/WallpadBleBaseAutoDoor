@@ -1,4 +1,4 @@
-name: C.P BLE Door Presence
+name: 치즈가루 BLE 자동문 재실
 packageKey: cp-ble-door-presence-discovery
 permissions:
   lan: {}
