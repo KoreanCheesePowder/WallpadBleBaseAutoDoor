@@ -1,91 +1,36 @@
-C.P BLE Door Presence v1.1.5
+C.P BLE Door Presence v1.3.1
 
-변경사항
-- 기존 buildbook37604.doorProximity capability 재사용 (새 capability 생성 안 함)
-- 내부 offline 키는 SmartThings 화면에서 "못찾음"으로 표시
-- 못찾음: 거리 0 dBm 고정
-- 가까움/멀어짐: 실제 EMA/RSSI 표시
-- LOST=0 뒤 실제 RSSI 수신 즉시 거리값 복구
-- STATUS_BEGIN~STATUS_END를 일괄 처리하여 순간적인 0/멀어짐 오표시 방지
-- 값이 변할 때만 SmartThings 이벤트를 발행하여 화면 갱신 지연/이벤트 폭주 감소
-- STATUS polling 5초 (보조 동기화)
-- 최대 4대 BLE Bond 지원
+ESP32-S3 BLE 제어 서비스와 TCP로 연동해 최대 4대 휴대폰의 RSSI, 근접 상태와 전체 재실 상태를 SmartThings에 제공하는 LAN Edge 드라이버입니다.
 
-설치
-1. SETUP-AND-INSTALL.cmd 실행
-2. 기존 custom capability를 업데이트하고 동일 packageKey 드라이버를 패키징/설치합니다.
-3. 새 custom capability는 생성하지 않습니다.
+주요 기능
+- 192.168.1.101:8900의 ESP BLE 제어 서비스 검색 및 자동 기기 생성
+- 최대 4대 BLE Bond 등록
+- 휴대폰별 RSSI/EMA, 가까움, 멀어짐, 못찾음, 미등록 상태 표시
+- 전체 휴대폰 중 하나라도 가까우면 presenceSensor를 present로 표시
+- PHONE1_RSSI~PHONE4_RSSI, EMA, LOST, NEAR 실시간 이벤트 즉시 반영
+- STATUS_BEGIN~STATUS_END 응답을 한 프레임으로 처리해 중간 상태 오표시 방지
+- 5초 간격 STATUS 보조 동기화, 4초 응답 제한, 2초 재연결
+- LOST=true일 때 오래된 RSSI/EMA를 폐기하고 -127 dBm / 못찾음으로 표시
+- 실제 RSSI가 다시 수신되면 LOST 상태를 즉시 해제
+- 핸드폰 등록 시작, 등록 수와 패스키 표시
+- 설정에서 선택한 슬롯을 momentary 버튼으로 삭제하고 ESP에 UNPAIR n 전송
+- refresh로 상태 즉시 요청
 
 표시 규칙
-- 가까움: 실제 거리값 + 가까움
-- 멀어짐: 실제 거리값 + 멀어짐
-- 못찾음: 0 dBm + 못찾음
+- 미등록: 0 dBm / 미등록
+- 등록 후 신호 없음: -127 dBm / 못찾음
+- 신호 수신: 실제 RSSI 또는 EMA / 가까움 또는 멀어짐
 
+설치
+1. SETUP-AND-INSTALL.cmd를 실행합니다.
+2. 기존 custom capability를 업데이트하고 같은 packageKey로 드라이버를 패키징·설치합니다.
+3. SmartThings 앱에서 기기 추가 -> 주변 검색을 실행합니다.
+4. 중복 기기가 있으면 CLEANUP-DUPLICATE.cmd를 사용합니다.
 
-v1.1.3 fixes:
-- 거리값과 상태를 항상 동기화된 쌍으로 갱신
-- 유효 RSSI가 있으면 못찾음 상태 금지
-- STATUS 요청 중첩 방지
-- 1초 UI 재동기화로 SmartThings 앱의 stale 상태 방지
+휴대폰 삭제
+SmartThings 기기 설정에서 삭제할 핸드폰 1~4를 선택한 뒤 상세 화면의 momentary 버튼을 누릅니다. 선택한 슬롯이 등록되어 있으면 ESP에 UNPAIR n을 전송하고 상태를 다시 조회합니다.
 
-v1.1.3 fixes:
-- Fixes fatal Lua error when an unset Edge device field returns no values to tonumber().
-- Uses field_number() for UI sync/status timeout timestamps, so missing fields safely fall back to 0.
-- Keeps v1.1.2 paired distance/state update behavior and STATUS frame staging.
-
-
-v1.1.5 fixes:
-- ESP 실시간 PHONE*_RSSI / EMA / LOST / NEAR 이벤트를 즉시 UI에 반영
-- STATUS polling을 0.5초에서 5초로 낮춰 STATUS_BEGIN 중첩과 TCP 부하 방지
-- STATUS 응답 완료 전 재요청 금지 + 4초 timeout
-- LOST=true 프레임에서 stale RSSI를 폐기하여 거리값/못찾음 모순 방지
-- 유효 RSSI가 다시 들어오면 LOST=false로 즉시 복구
-- 거리와 상태는 항상 같은 emit cycle에서 함께 갱신
-
-v1.1.6 stabilization
-- Full Edge Driver installation package based on v1.1.5.
-- Keeps immediate LOST -> 0 dBm / 못찾음 behavior.
-- Keeps immediate RSSI push -> live dBm / 가까움 or 멀어짐 behavior.
-- Keeps 5-second STATUS as backup synchronization only.
-- Driver Information version updated to v1.1.6.
-- Intended to pair with ESP32-S3 BLE STABLE v3 firmware.
-
-
-v1.1.7 FIXED
-- Adds visible 핸드폰 삭제 (마지막 등록) push button.
-- Button sends UNPAIR_LAST to ESP V8.
-- Registered-but-lost RSSI displays -127 dBm instead of 0 dBm.
-- Setup updates phonePairing capability schema before presentation.
-
-
-v1.3.2
-- Adds a separate Current Phone Delete custom capability so the button renders as its own detail-view card.
-- Button label: 현재 핸드폰 삭제
-- Safety: SmartThings Edge does not reveal which physical handset pressed a command. The driver never guesses.
-  If only one phone is registered, that slot is removed. With multiple phones, deletion proceeds only when exactly one registered phone is currently detected; otherwise status becomes 현재 핸드폰 식별 불가 and nothing is deleted.
-- Uses ESP V8 command UNPAIR <slot>. No ESP firmware change is required.
-
-
-v1.3.2
-- 403을 발생시키던 currentPhoneDelete custom capability 생성 제거
-- SmartThings 표준 momentary push 버튼으로 현재 핸드폰 삭제 구현
-- 버튼 처리 시 ESP V8에 UNPAIR n 전송
-
-
-v1.3.2 삭제 방식: SmartThings 기기 설정에서 삭제할 핸드폰 1~4를 선택한 뒤 상세화면의 선택한 핸드폰 삭제 버튼을 누르면 ESP에 UNPAIR n을 전송합니다. 신규 custom capability/command를 만들지 않습니다.
-
-
-v1.3.2 변경사항
-- 상세화면에 핸드폰 1~4 거리/RSSI와 상태를 각각 표시합니다.
-- PHONE1_RSSI~PHONE4_RSSI, EMA, LOST, NEAR 값을 각 슬롯 카드에 독립 반영합니다.
-- 미등록 슬롯은 0 dBm / 미등록, 등록 후 신호 미수신은 -127 dBm / 못찾음으로 표시합니다.
-- 기존 전체 거리/상태/재실 센서는 유지합니다.
-- 폰별 거리/상태를 자동화 조건에서도 선택할 수 있도록 phone1~phone4 component를 추가했습니다.
-- 귀가 전용 일회성 이벤트는 다음 ESP 펌웨어와 함께 추가 예정입니다.
-
-
-v1.3.2 상태 표시 수정
-- STATUS_END마다 phone1~phone4의 거리와 상태를 강제 동기화합니다.
-- 등록폰: 가까움 / 멀어짐 / 못찾음
-- 미등록 슬롯: 미등록
-- ESP V9 이하에서도 기존 PHONE*_NEAR/LOST/RSSI/EMA 데이터로 동작합니다.
+드라이버 정보
+- 제작자: 치즈가루
+- 버전: v1.3.1
+- packageKey: cp-ble-door-presence-discovery
