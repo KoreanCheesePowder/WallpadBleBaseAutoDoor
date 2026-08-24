@@ -14,12 +14,17 @@ local ESP_IP = "192.168.1.101"
 local ESP_PORT = 8900
 local DEVICE_DNI = "cp-ble-door-presence-192.168.1.101"
 local DEVICE_PROFILE = "ble-door-presence"
-local DRIVER_VERSION = "v1.3.1"
+local DRIVER_VERSION = "v1.4.0"
 local AUTHOR = "치즈가루"
-local POLL_INTERVAL_SEC = 5.0
-local STATUS_TIMEOUT_SEC = 4.0
+local POLL_INTERVAL_SEC = 15.0
+local STATUS_TIMEOUT_SEC = 8.0
 local UI_HEARTBEAT_SEC = 5.0
-local RECONNECT_DELAY_SEC = 2
+
+-- ESP32에 재접속 폭주를 만들지 않기 위한 backoff.
+-- 짧게 끊겼다가 바로 복구되더라도 2초 무한 재접속을 반복하지 않는다.
+local RECONNECT_DELAY_MIN_SEC = 3
+local RECONNECT_DELAY_MAX_SEC = 30
+local STABLE_CONNECTION_SEC = 30
 
 local FIELD_WORKER_STARTED = "ble_worker_started"
 local FIELD_SOCKET = "ble_socket"
@@ -448,14 +453,23 @@ local function request_status(device)
 end
 
 local function connection_worker(device)
+  local reconnect_delay = RECONNECT_DELAY_MIN_SEC
+
   while not device:get_field(FIELD_REMOVED) do
     local sock = socket.tcp()
     sock:settimeout(3)
 
+    -- 지원되는 런타임에서는 TCP keepalive/Nagle 해제를 사용한다.
+    -- 미지원 Edge 런타임에서도 드라이버가 죽지 않도록 pcall 처리한다.
+    pcall(function() sock:setoption("keepalive", true) end)
+    pcall(function() sock:setoption("tcp-nodelay", true) end)
+
     log.info(string.format("Connecting to ESP BLE control %s:%d", ESP_IP, ESP_PORT))
     local ok, err = sock:connect(ESP_IP, ESP_PORT)
+    local connected_at = nil
 
     if ok then
+      connected_at = now_sec()
       log.info("ESP BLE control connected")
       device:set_field(FIELD_SOCKET, sock)
       device:set_field(FIELD_CONNECTED, true)
@@ -467,13 +481,13 @@ local function connection_worker(device)
       local last_poll = 0
       request_status(device)
 
-      while true do
+      while not device:get_field(FIELD_REMOVED) do
         local now = now_sec()
         local pending = device:get_field(FIELD_STATUS_PENDING) == true
         local sent_at = field_number(device, FIELD_STATUS_SENT_AT, 0)
 
-        -- STATUS는 5초 간격의 보조 동기화만 사용한다.
-        -- RSSI/LOST/NEAR 실시간 라인은 즉시 UI에 반영하며, 응답 중에는 재요청하지 않는다.
+        -- STATUS는 15초 간격의 보조 동기화만 사용한다.
+        -- RSSI/LOST/NEAR는 ESP가 실시간 PUSH하므로 STATUS를 짧은 주기로 두드릴 필요가 없다.
         if pending and (now - sent_at) > STATUS_TIMEOUT_SEC then
           log.warn("STATUS response timeout; resetting frame")
           device:set_field(FIELD_STATUS_PENDING, false)
@@ -511,9 +525,24 @@ local function connection_worker(device)
     device:set_field(FIELD_STATUS_PENDING, false)
     device:set_field(FIELD_IN_STATUS, false)
     clear_status_stage(device)
-    emit_aggregate(device, true)
+
+    -- 연결이 아주 짧게 흔들릴 때 UI를 즉시 '못찾음'으로 뒤집지 않는다.
+    -- 실제 PHONE*_LOST 이벤트는 ESP가 별도로 PUSH하므로 그 이벤트는 그대로 즉시 반영된다.
+
     if not device:get_field(FIELD_REMOVED) then
-      socket.sleep(RECONNECT_DELAY_SEC)
+      local lived = 0
+      if connected_at ~= nil then
+        lived = now_sec() - connected_at
+      end
+
+      if lived >= STABLE_CONNECTION_SEC then
+        reconnect_delay = RECONNECT_DELAY_MIN_SEC
+      else
+        reconnect_delay = math.min(RECONNECT_DELAY_MAX_SEC, reconnect_delay * 2)
+      end
+
+      log.info(string.format("ESP reconnect in %.0fs", reconnect_delay))
+      socket.sleep(reconnect_delay)
     end
   end
 end
