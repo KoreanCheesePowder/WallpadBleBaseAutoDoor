@@ -1,3 +1,5 @@
+local CP_MONITOR_META = { driver_name = "C.P BLE Door Presence", driver_version = "v1.4.1", package_key = "cp-ble-door-presence-discovery", target_name = "ESP BLE Gateway", target_host = "192.168.1.101", target_port = 8899, transport = "tcp" }
+local cp_monitor = require "cp_monitor"
 local Driver = require "st.driver"
 local capabilities = require "st.capabilities"
 local log = require "log"
@@ -14,7 +16,7 @@ local ESP_IP = "192.168.1.101"
 local ESP_PORT = 8900
 local DEVICE_DNI = "cp-ble-door-presence-192.168.1.101"
 local DEVICE_PROFILE = "ble-door-presence"
-local DRIVER_VERSION = "v1.4.0"
+local DRIVER_VERSION = "v1.4.1"
 local AUTHOR = "치즈가루"
 local POLL_INTERVAL_SEC = 15.0
 local STATUS_TIMEOUT_SEC = 8.0
@@ -109,6 +111,7 @@ local function send_line(device, line)
   end
 
   local ok, err = sock:send(line .. "\n")
+  if ok then pcall(cp_monitor.tx, device, #line + 1, line) end
   if ok == nil then
     return false, err
   end
@@ -470,6 +473,7 @@ local function connection_worker(device)
 
     if ok then
       connected_at = now_sec()
+      pcall(cp_monitor.connection, device, "connected")
       log.info("ESP BLE control connected")
       device:set_field(FIELD_SOCKET, sock)
       device:set_field(FIELD_CONNECTED, true)
@@ -507,8 +511,10 @@ local function connection_worker(device)
 
         local line, recv_err, partial = sock:receive("*l")
         if line ~= nil then
+          pcall(cp_monitor.rx, device, #line, "ESP RX")
           parse_line(device, line)
         elseif partial ~= nil and partial ~= "" then
+          pcall(cp_monitor.rx, device, #partial, "ESP RX")
           parse_line(device, partial)
         elseif recv_err ~= "timeout" then
           log.warn(string.format("ESP connection closed: %s", tostring(recv_err)))
@@ -516,6 +522,7 @@ local function connection_worker(device)
         end
       end
     else
+      pcall(cp_monitor.connection, device, "disconnected", tostring(err))
       log.warn(string.format("ESP connect failed: %s", tostring(err)))
     end
 
@@ -585,6 +592,7 @@ local function added_handler(driver, device)
 end
 
 local function init_handler(driver, device)
+  pcall(cp_monitor.start, device, CP_MONITOR_META)
   device:set_field(FIELD_REMOVED, false)
   emit_static_info(device)
   ensure_worker(device)
